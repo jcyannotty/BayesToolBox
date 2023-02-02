@@ -105,6 +105,10 @@ log_post = function(z, ninfo, hp, lam_f, lam_z, lam_del, rho_z, rho_del, psi, th
   V = (1/lam_z)*Rz
   V[1:nf, 1:nf] = V[1:nf, 1:nf] + (1/lam_del)*Rdel + epsilon
   
+  # Add a nugget for stability
+  nug = 10^(-6)
+  diag(V) = diag(V) + nug
+
   #Get V inverse via Choleski Decomposition and log determinant
   #Check to see if all eigen values are positive to avoid an error
   if(any(eigen(V)$values < 0)){return(-Inf)}
@@ -178,7 +182,7 @@ adapt_delta = function(accept_num, last_accept, steps, current_delta, goal_rate 
 calibrate = function(z, z_diff, mh_proposal, ninfo, hp, N, N_adapt){
   #Initialize posterior vectors
   post_lamz = 1
-  post_lamf = 50
+  post_lamf = 1
   post_lamdel = 1
   post_rho = matrix(NA, nrow = N, ncol = ninfo$num_control)
   post_rhodel = matrix(NA, nrow = N, ncol = ninfo$num_control)
@@ -450,6 +454,13 @@ calibrate = function(z, z_diff, mh_proposal, ninfo, hp, N, N_adapt){
   out = list(z = z, lambda_z = post_lamz[sdr], lambda_f = post_lamf[sdr], lambda_del = post_lamdel[sdr],
              rho_z = post_rho[sdr,], rho_del = post_rhodel[sdr,], psi = post_psi[sdr,],
              theta = post_theta[sdr,])
+  
+  # Cast to matrix if needed
+  if(!is.matrix(out$rho_z)){out$rho_z = matrix(post_rho[sdr,], ncol = 1)}
+  if(!is.matrix(out$rho_del)){out$rho_del = matrix(post_rhodel[sdr,], ncol = 1)}
+  if(!is.matrix(out$psi)){out$psi = matrix(post_psi[sdr,], ncol = 1)}
+  if(!is.matrix(out$theta)){out$theta = matrix(post_theta[sdr,], ncol = 1)}
+  
   return(out)
 }
 
@@ -481,7 +492,7 @@ predict_calibrate = function(fit, pred_diff, ninfo){
     #Get the delta matrix of differences for field obs and predictions
     del_diff = list()
     for(k in 1:ncon){
-      del_diff[[k]] = z_diff[[k]][1:(nf+np), 1:(nf+np)]  
+      del_diff[[k]] = pred_diff[[k]][1:(nf+np), 1:(nf+np)]  
     }
     
     #Now get the covariance matrices for eta and delta
@@ -499,6 +510,12 @@ predict_calibrate = function(fit, pred_diff, ninfo){
     V21 = V[(np+1):nn,1:np] #Covariance between train and pred
     V12 = V[1:np,(np+1):nn] #Covariance between pred and train
     V11 = V[1:np,1:np] #Covaraince of pred
+    
+    # Check if nugget is needed
+    if(any(eigen(V22)$values < 0)){
+      nug = 10^(-6)
+      diag(V22) = diag(V22) + nug
+    }
     
     #Get inverse of V22 -- choleksi decomposition
     V22_chol = chol(V22)
@@ -524,7 +541,7 @@ predict_calibrate = function(fit, pred_diff, ninfo){
     #Get the delta matrix of differences for field obs
     del_diff = list()
     for(k in 1:ncon){
-      del_diff[[k]] = z_diff[[k]][(np+1):(nf+np), (np+1):(nf+np)]  
+      del_diff[[k]] = pred_diff[[k]][(np+1):(nf+np), (np+1):(nf+np)]  
     }
     Rdel = rho_covmat(del_diff, fit$rho_del[i,])
     
@@ -537,6 +554,12 @@ predict_calibrate = function(fit, pred_diff, ninfo){
     V21 = V[(np+1):nn,1:np] #Covariance between train and pred
     V12 = V[1:np,(np+1):nn] #Covariance between pred and train
     V11 = V[1:np,1:np] #Covaraince of pred
+    
+    # Check if nugget is needed
+    if(any(eigen(V22)$values < 0)){
+      nug = 10^(-6)
+      diag(V22) = diag(V22) + nug
+    }
     
     #Get inverse of V22 -- choleksi decomposition
     V22_chol = chol(V22)
@@ -557,6 +580,9 @@ predict_calibrate = function(fit, pred_diff, ninfo){
     #Generate the predicted value from this distribution
     u=rnorm(np,0,1)
     fit_eta[i,]=mp+Sp%*%u
+    
+    #Progress Tracker
+    cat(i/Npost*100," percent complete\r")
   }
   
   #Get summary statistics for the predictions
