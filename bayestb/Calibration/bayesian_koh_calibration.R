@@ -512,7 +512,7 @@ predict_calibrate = function(fit, pred_diff, ninfo){
     V11 = V[1:np,1:np] #Covaraince of pred
     
     # Check if nugget is needed
-    if(any(eigen(V22)$values < 0)){
+    if(any(eigen(V22)$values < 10^(-8))){
       nug = 10^(-6)
       diag(V22) = diag(V22) + nug
     }
@@ -556,7 +556,7 @@ predict_calibrate = function(fit, pred_diff, ninfo){
     V11 = V[1:np,1:np] #Covaraince of pred
     
     # Check if nugget is needed
-    if(any(eigen(V22)$values < 0)){
+    if(any(eigen(V22)$values < 10^(-8))){
       nug = 10^(-6)
       diag(V22) = diag(V22) + nug
     }

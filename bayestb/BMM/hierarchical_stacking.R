@@ -127,12 +127,16 @@ get_psis_wts = function(yt_den){
     if(sum(psis_obj$diagnostics$pareto_k > 0.7) != 0){
       print(paste("Warning, unstable k. Model", j, '-- Max k =', 
                   round(max(psis_obj$diagnostics$pareto_k),3)))
+      #print("PSIS Weights are not used for and observation with k > 0.7. Use default weights of 1 for this given obs.")
+      h = which(psis_obj$diagnostics$pareto_k > 0.7)
     }else{
       print(paste("PSIS weights for Model", j, '= Complete'))
     }
     #Converting from log weights to normal scale
     psis_weights[,,j] = weights(psis_obj, log = FALSE, normalize = FALSE)  
   }
+  
+  
   return(psis_weights)
 }
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -170,6 +174,7 @@ mh_logstep = function(pdc, pdn, current_val, new_val){
     if(alpha > log(u)){
       theta0 = new_val
       accept = 1
+      #if(alpha < -4){print(paste0("alpha = ",alpha, " -- U = ",u))}
     }else{
       theta0 = current_val
       accept = 0
@@ -205,6 +210,7 @@ fit_hs = function(loo_pd, mh_proposal, hsp_basis, hp, N, N_burn){
   
   #Initialize the hs posterior array for the parameters used to model the unconstrained weights
   hsp_array = array(1, dim = c(N,m,K))
+  hsp_accept = matrix(0, nrow = m, ncol = K-1)
   
   #Initialize the 1st row elements
   for(j in 1:u){
@@ -235,6 +241,7 @@ fit_hs = function(loo_pd, mh_proposal, hsp_basis, hp, N, N_burn){
       #MH Step 
       mh = mh_logstep(pdc = pdc, pdn = pdn, current_val = c_mat, new_val = n_mat)
       c_mat = mh$theta0
+      hsp_accept[1,j] = hsp_accept[1,j] + mh$accept
       
       #____________________________________________________
       #Sample sigma2j
@@ -252,6 +259,7 @@ fit_hs = function(loo_pd, mh_proposal, hsp_basis, hp, N, N_burn){
       #MH Step 
       mh = mh_logstep(pdc = pdc, pdn = pdn, current_val = c_mat, new_val = n_mat)
       c_mat = mh$theta0
+      hsp_accept[2,j] = hsp_accept[2,j] + mh$accept
       
       #____________________________________________________
       #Sample alpha_rj
@@ -271,7 +279,7 @@ fit_hs = function(loo_pd, mh_proposal, hsp_basis, hp, N, N_burn){
         #MH Step 
         mh = mh_logstep(pdc = pdc, pdn = pdn, current_val = c_mat, new_val = n_mat)
         c_mat = mh$theta0
-       
+        hsp_accept[r,j] = hsp_accept[r,j] + mh$accept
       }
      
     }
@@ -287,8 +295,10 @@ fit_hs = function(loo_pd, mh_proposal, hsp_basis, hp, N, N_burn){
   #Set sample draws to save
   #sdr = (N_adapt+1):N
   sdr = (N_burn + 1):N
-  out = hsp_array[sdr,,]
-  colnames(out) = c('mu_k', 'sig2_k', paste0('a',1:J,'_k'))
+  out_post = hsp_array[sdr,,]
+  colnames(out_post) = c('mu_k', 'sig2_k', paste0('a',1:J,'_k'))
+  rownames(hsp_accept) = colnames(out_post)
+  out = list(post = out_post, accept = hsp_accept)
   return(out)
 }
 
