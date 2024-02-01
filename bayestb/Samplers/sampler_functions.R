@@ -44,6 +44,24 @@ rmvn = function(mvec, V){
   return(out)
 }
 
+
+# Scaled Inverse Chi-squared
+rscinvchi2 = function(n,v,lam){
+  # Use inv-gamma identity (invg scale = gamma rate)
+  out = 1/rgamma(n,shape=v/2,rate=v*lam/2)
+  return(out)
+}
+
+# Scaled Inverse Chi-squared
+rtscaled = function(n,df,mean,scale){
+  # Use inv-gamma identity (invg scale = gamma rate)
+  out = mean + sd*rt(n,df)
+  return(out)
+}
+
+#-----------------------------------------------------
+# Samplers Helpers in MCMC
+#-----------------------------------------------------
 # Log metropolis hastings
 # nprop: proposal of c -> n
 # cprop: proposal of n -> c
@@ -65,6 +83,9 @@ logmh = function(log_nden, log_nprop, ntheta, log_cprop, log_cden, ctheta){
   return(out)
 }
 
+#-----------------------------------------------------
+# Designs
+#-----------------------------------------------------
 # Grid 2-D Design Sampler 
 # nc = number columns, nr = number rows, n = total points
 # xmin, xmax = 2-d vector of min/max values for each dimension
@@ -100,6 +121,103 @@ grid_2d_testset = function(x_train, d = 1, nbd = 5){
     x_test[start:end, ] = cbind(x_train[i,1]+dx,x_train[i,2]+dy)    
   }
   return(x_test)
+}
+
+
+# Max distance design over Prod [ad,bd] for d = 1,...,p 
+# N = the discretized set of Prod [ad,bd]
+# n = number of samples 
+# m = number of samples to generate and test
+# xgrid = list of unique points per dimension
+max_distance_design = function(alist, blist, N, n, m, xgrid = NULL){
+  # Generate points within [0,1]
+  p = length(alist)
+  if(is.null(xgrid)){
+    xu = seq(0,1,length = N)
+  }else{
+    xu = list()
+    for(j in 1:p){
+      xu[[j]] = (xgrid[[j]]-alist[j])/(blist[j] - alist[j])      
+    }
+    
+  }
+
+  # Randomly sample new training set from xu
+  for(i in 1:m){
+    if(is.null(xgrid)){
+      xset = matrix(sample(xu,size = n*p),byrow = TRUE, nrow = n, ncol = p)  
+    }else{
+      xset = matrix(0, ncol = p, nrow = n)
+      for(j in 1:p){
+        xset[,j] = sample(xu[[j]],size = n, replace = TRUE)  
+      }
+    }
+    
+    distx = matrix(0,nrow = n, ncol = n)
+    # Get l2 distance
+    for(j in 1:p){
+      distx = distx + outer(xset[,j], xset[,j], "-")^2
+    }
+    if(i == 1){
+      dmin = sqrt(min(distx[upper.tri(distx,diag=FALSE)]))
+      xout = xset
+    }else{
+      dmin_temp = sqrt(min(distx[upper.tri(distx,diag=FALSE)]))
+      if(dmin_temp<dmin){
+        dmin = dmin_temp
+        xout = xset
+      }
+    }
+  }
+  
+  # Scale the inputs of the winning design
+  if(is.null(xgrid)){
+    for(j in 1:p){
+      xout[,j] = xout[,j]*(blist[1] - alist[1]) + alist[1] 
+    }
+  }
+    
+  return(xout)
+}
+
+
+max_distance_design_unif_grid = function(Nlist, n, m){
+  # Generate points within [0,1]
+  p = length(Nlist)
+  xg = list()
+  for(i in 1:p){
+    xg[[i]] = seq(1,Nlist[[i]], by = 1)/Nlist[[i]]
+  }
+  
+  # Randomly sample new training set from xu
+  for(i in 1:m){
+    xexp = expand.grid(xg)
+    xset = xexp[sample(1:nrow(xexp), size = n, replace = FALSE),]
+    
+    distx = matrix(0,nrow = n, ncol = n)
+    # Get l2 distance
+    for(j in 1:p){
+      distx = distx + outer(xset[,j], xset[,j], "-")^2
+    }
+    if(i == 1){
+      dmin = sqrt(max(distx))
+      #dmin = sqrt(max(distx[upper.tri(distx,diag=FALSE)]))
+      xout = xset
+    }else{
+      dmin_temp = sqrt(max(distx)) #sqrt(max(distx[upper.tri(distx,diag=FALSE)]))
+      if(dmin_temp<dmin){
+        dmin = dmin_temp
+        xout = xset
+      }
+    }
+    cat("Min-Max Progress: ",round(i/m, 4),"\r")
+  }
+  
+  for(j in 1:p){
+    xout[,j] = xout[,j]*Nlist[[j]]
+  }
+  
+  return(xout)
 }
 
 

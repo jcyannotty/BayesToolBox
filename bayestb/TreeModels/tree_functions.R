@@ -144,13 +144,15 @@ get_bounds = function(tree, path, xmin, xmax){
 get_cuts = function(tree){
   cuts = c()
   vars = c()
+  nids = c()
   for(i in 1:length(tree)){
     if(tree[[i]]$l != -1){
       cuts = append(cuts,tree[[i]]$c)
       vars = append(vars,tree[[i]]$v)
+      nids = append(nids,tree[[i]]$nid)
     }
   }
-  out = list(cuts = cuts, vars = vars)
+  out = list(cuts = cuts, vars = vars, nids = nids)
   return(out)
 }
 
@@ -181,7 +183,7 @@ generate_tree = function(a,b,xcuts,xmin,xmax){
   tree = init_tree()
   cnode = tree$nid1
   tnodes = c()
-  depth_by_id = 2^(1:10)
+  depth_by_id = 2^(1:50)
   p = length(xcuts)
   queue = c(1)
   
@@ -219,21 +221,32 @@ generate_tree = function(a,b,xcuts,xmin,xmax){
           vmin = tree[[pname]]$c
         }
       }    
-        
+      
       if(q>1){
-        cuts = xcuts[[v]][which(xcuts[[v]]>=vmin & xcuts[[v]]<=vmax)]
+        avail_cuts = which(xcuts[[v]]>vmin & xcuts[[v]]<vmax)
+        if(length(avail_cuts)){
+          cuts = xcuts[[v]][avail_cuts]  
+        }else{
+          cuts = NULL
+        }
       }else{
         cuts = xcuts[[v]] # special case for root node
       }  
-      c = sample(cuts,1)
-      
-      # Birth step and append
-      out = birth(cnode,v,c)
-      tree = append_tree(tree,out)
-      
-      # Remove this internal node and Add to front of queue (left, right)
-      queue = queue[-1]
-      queue = c(out$ltnode$nid,out$rtnode$nid,queue)
+      if(length(cuts)>0){
+        c = sample(cuts,1)
+        
+        # Birth step and append
+        out = birth(cnode,v,c)
+        tree = append_tree(tree,out)
+        
+        # Remove this internal node and Add to front of queue (left, right)
+        queue = queue[-1]
+        queue = c(out$ltnode$nid,out$rtnode$nid,queue)
+      }else{
+        # Auto reject
+        tnodes = append(tnodes,cnode$nid)
+        queue = queue[-1]
+      }
     }else{
       # Term node, add to the list and pop from the queue
       tnodes = append(tnodes,cnode$nid)

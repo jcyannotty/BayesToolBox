@@ -23,14 +23,14 @@ sig2_sample = function(X, y, a_shape, b_scale, beta_vec, mu_vec, V){
 beta_sample = function(X, y, sig2, mu_vec, V){
   #Get inverses
   V_inv = chol2inv(chol(V))
-  Sig_post = chol2inv(chol(t(X)%*%X  + V_inv))
+  Sig_post = chol2inv(chol(t(X)%*%X/sig2  + V_inv))
   
   #Get sum of precision weighted means
-  b = t(X)%*%y + V_inv%*%mu_vec
+  b = t(X)%*%y/sig2 + V_inv%*%mu_vec
   
   #Get posterior mean and variance
   beta_mean = Sig_post%*%b
-  beta_var = Sig_post*sig2
+  beta_var = Sig_post
   
   beta_new = mvrnorm(n = 1, mu = beta_mean, Sigma = beta_var)  
   return(beta_new)
