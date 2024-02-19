@@ -25,13 +25,13 @@ sample_gp = function(mx, Rx){
 
 
 # Predictive Distribution from GP
-predict_dist_gp = function(y1,m1,m2,R11,R22,R12){
+predict_dist_gp = function(y1,m1,m2,R11,R22,R12,nug=1e-6){
   #Set dimension parameters
   n1 = length(m1)
   n2 = length(m2)
   
   #Get inverse of R11 -- choleksy decomposition
-  R11_chol = chol(R11)
+  R11_chol = chol(R11+diag(nug,n1))
   R11_inv = chol2inv(R11_chol)
     
   #Get mean and covaraince -- recall we assume mean 0 of the data

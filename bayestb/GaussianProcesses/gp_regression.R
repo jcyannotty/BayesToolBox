@@ -4,7 +4,6 @@
 source("/home/johnyannotty/Documents/BayesToolBox/bayestb/GaussianProcesses/kernels.R")
 source("/home/johnyannotty/Documents/BayesToolBox/bayestb/GaussianProcesses/gp_utils.R")
 
-
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 # Log prior for covariance parameters
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -161,7 +160,8 @@ gp_train = function(y, x, cov_function, priornames,hp, mh_proposal, nd, nadapt, 
 
 
 # Predictions
-gp_predict = function(fit, y, x_train, x_test, m_train, m_test, cov_function, nug = 1e-6){
+gp_predict = function(fit, y, x_train, x_test, m_train, m_test, cov_function, nug = 1e-6, 
+                      pred_y = FALSE){
   # Check if x is a matrix
   ny = length(y) #Number of observations
   if(!is.matrix(x_train)){
@@ -185,6 +185,7 @@ gp_predict = function(fit, y, x_train, x_test, m_train, m_test, cov_function, nu
   x22_pairs = expand.grid(1:np,1:np)
   
   fit_pred = matrix(NA, nrow = Npost, ncol = np)
+  
   #Make predictions based on the Npost posterior draws
   for(i in 1:Npost){
     #Get covaraince matrices for the GP modeling the function and the random error
@@ -192,9 +193,9 @@ gp_predict = function(fit, y, x_train, x_test, m_train, m_test, cov_function, nu
     R11 = cov_function(x1 = x_train[x11_pairs[,1],], x2 = x_train[x11_pairs[,2],], params = pvec,
                        nrow = ny, ncol = ny, sig2 = TRUE)
     R12 = cov_function(x1 = x_train[x12_pairs[,1],], x2 = x_test[x12_pairs[,2],], params = pvec, 
-                       nrow = ny, ncol = np, sig2 = FALSE)
+                       nrow = ny, ncol = np, sig2 = pred_y)
     R22 = cov_function(x1 = x_test[x22_pairs[,1],], x2 = x_test[x22_pairs[,2],], params = pvec, 
-                       nrow = np, ncol = np,sig2 = FALSE)
+                       nrow = np, ncol = np,sig2 = pred_y)
 
     # Reshape
     #R11 = matrix(R11, nrow = ny, ncol = ny, byrow = TRUE)
@@ -230,3 +231,5 @@ gp_predict = function(fit, y, x_train, x_test, m_train, m_test, cov_function, nu
   out = list(fit_pred = fit_pred, pred_mean = pred_mean, pred_sd = pred_sd)
   return(out)
 }
+
+

@@ -2,6 +2,9 @@
 # Feature weighted linear stacking
 # Frequentist version of model mixing
 #------------------------------------------------
+
+library(glmnet)
+#------------------------------------------------
 fwls = function(y_train, f_train, g_list, lambda){
   # Control
   n = nrow(f_train)
@@ -50,7 +53,38 @@ define_wts_basis = function(f, g_list){
 }
 
 
-fwls_predict = function(fit,f_test,gtest_list,alpha = 0.05){
+fwls_predict_mean = function(fit,f_test,gtest_list){
+  # Control
+  n = nrow(f_test)
+  K = ncol(f_test)
+  if(!("beta" %in% names(fit))){stop("Error, fit must be output of fwls(...)")}
+  
+  # Get wts basis and mean prediction
+  wts = define_wts_basis(f_test, gtest_list)
+  A = wts$gf_matrix
+  beta = fit$beta
+  wx_matrix = matrix(0, nrow = n, ncol = 0)
+  bind = 0
+  for(j in 1:K){
+    b0 = bind + 1
+    b1 = fit$Bvec[j] + bind
+    bind = b1-b0 + 1 + bind
+    
+    betaj = fit$beta[b0:b1]
+    w = gtest_list[[j]]%*%betaj
+    wx_matrix = cbind(wx_matrix,w)
+  }
+  colnames(wx_matrix) = paste0("w",1:K)
+  
+  # Get mean prediction of f
+  fx_values = rowSums(f_test*wx_matrix)
+  
+  out = list(fx = fx_values, wx = wx_matrix)
+  return(out)
+}
+
+
+fwls_predict = function(fit,f_test,gtest_list,alpha = 0.05, return_cov = FALSE){
   # Control
   n = nrow(f_test)
   K = ncol(f_test)
@@ -62,7 +96,7 @@ fwls_predict = function(fit,f_test,gtest_list,alpha = 0.05){
   beta = fit$beta
   fx_values = A%*%beta
   fx_cov = A%*%fit$beta_cov%*%t(A)
-    
+  
   # Get wts and uncertainty
   bind = 0
   wx_matrix = matrix(0, nrow = n, ncol = 0)
@@ -95,8 +129,13 @@ fwls_predict = function(fit,f_test,gtest_list,alpha = 0.05){
     wx_ub[,j] = wx_matrix[,j] + z*diag(wx_cov[[j]])
   }
   
-  out = list(fx = fx_values, wx = wx_matrix, fx_cov = fx_cov, wx_cov = wx_cov,
-             fx_lb = fx_lb, fx_ub = fx_ub, wx_lb = wx_lb, wx_ub = wx_ub)
+  if(return_cov){
+    out = list(fx = fx_values, wx = wx_matrix, fx_cov = fx_cov, wx_cov = wx_cov,
+               fx_lb = fx_lb, fx_ub = fx_ub, wx_lb = wx_lb, wx_ub = wx_ub)
+  }else{
+    out = list(fx = fx_values, wx = wx_matrix,
+               fx_lb = fx_lb, fx_ub = fx_ub, wx_lb = wx_lb, wx_ub = wx_ub)
+  }
   return(out)
 }
 
@@ -108,7 +147,9 @@ fwls_construct_basis = function(x,K,basis = "linear"){
   g_list = list()
   for(j in 1:K){
     basisj = basis[j]
-    if(basisj == "linear"){
+    if(basisj == "constant"){
+      xt = data.frame(x^0)
+    }else if(basisj == "linear"){
       xt = data.frame(x)
     }else if(basisj == "quad"){
       xt = data.frame(x,x^2)
@@ -124,4 +165,23 @@ fwls_construct_basis = function(x,K,basis = "linear"){
     g_list[[j]] = model.matrix(~as.matrix(xt))  
   }  
   return(g_list)
+}
+
+fwls_cv = function(y_train, f_train, g_list, lambda_seq){
+    # Control
+    n = nrow(f_train)
+    K = ncol(f_train)
+    
+    # Get wts basis
+    wts = define_wts_basis(f_train, g_list)
+    A = wts$gf_matrix
+    Bvec = wts$Bvec
+    B = sum(Bvec)
+    
+    # Cross validation fit
+    fitcv = cv.glmnet(A, y_train, alpha = 0, lambda = lambda_seq)
+    lam0 = fitcv$lambda.1se
+
+    out = fwls(y_train,f_train,g_list,lam0)    
+    return(out)
 }

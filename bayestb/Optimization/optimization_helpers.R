@@ -17,3 +17,20 @@ simplex_l2 = function(a,s=1){
   b = b[order(aorder)]
   return(b)
 }
+
+# Sparse gen projection
+sparse_gen = function(a,tmp){
+  # Sort from max to min
+  aorder = rev(order(a))
+  astar = a[aorder]
+  n = length(a)
+  
+  # Find the largest k such that a[k] - lam[k] > 0  
+  lam = (cumsum(astar) - 1 + tmp)/(1:n)
+  h = max(which((astar-lam)>0))
+  
+  # Return simplex projection
+  b = sapply(astar,function(x) max((x-lam[h])/(1-tmp),0))
+  b = b[order(aorder)]
+  return(b)
+}
