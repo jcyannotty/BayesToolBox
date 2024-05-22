@@ -22,7 +22,8 @@ def_lines = rep("solid",length(def_colors))
 #------------------------------------------------
 # Plot 1D mena with uncertainty bounds
 plot_mean1d = function(x, pmean, plb = NULL, pub = NULL, y_lim = NULL,
-                       amean = NULL,apts_x = NULL, apts_y = NULL, apts_sz = 1.2,
+                       amean = NULL,apts_x = NULL, apts_y = NULL, apts_sz = 1.2, apts_col = "black", 
+                       apts_pch = 16, apts_alpha = 1,
                        title = 'Mean Function', y_lab = "f(x)", x_lab = "x", in_labs = NULL,
                        colors = def_colors, line_type_list = def_lines){
   
@@ -69,7 +70,8 @@ plot_mean1d = function(x, pmean, plb = NULL, pub = NULL, y_lim = NULL,
   
   
   if(!is.null(apts_x) & !is.null(apts_y)){
-    p = p + geom_point(data = data.frame(x0=apts_x,y0=apts_y), aes(x0,y0), size= apts_sz) 
+    p = p + geom_point(data = data.frame(x0=apts_x,y0=apts_y), aes(x0,y0), size= apts_sz, 
+                       pch = apts_pch, color = apts_col, alpha = apts_alpha) 
   }
   return(p)
 }
